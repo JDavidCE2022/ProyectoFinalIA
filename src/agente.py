@@ -5,7 +5,10 @@ import requests
 from herramientas import HERRAMIENTAS, ESQUEMAS, FECHA_MAX
 
 T_MAX = 5
-MODELO = os.getenv("MODELO_CHAT", "llama-3.3-70b-versatile")
+MODELO = os.getenv("MODELO_CHAT", "").strip()
+# Orden de preferencia si no se fija MODELO_CHAT. Se usa el primero que la clave tenga disponible.
+PREFERIDOS = ["openai/gpt-oss-120b", "llama-3.3-70b-versatile", "openai/gpt-oss-20b",
+              "qwen/qwen3.8-27b", "llama-3.1-8b-instant"]
 BASE_URL = os.getenv("BASE_URL_CHAT", "https://api.groq.com/openai/v1")
 
 SISTEMA = f"""Eres AireBot, un asistente sobre la calidad del aire del Valle de Aburrá.
@@ -27,6 +30,11 @@ class ClienteChat:
         self.headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
         self.timeout = timeout
 
+    def modelos(self):
+        r = requests.get(self.url.replace("/chat/completions", "/models"), headers=self.headers, timeout=self.timeout)
+        r.raise_for_status()
+        return [m["id"] for m in r.json().get("data", [])]
+
     def completar(self, **cuerpo):
         r = requests.post(self.url, headers=self.headers, json=cuerpo, timeout=self.timeout)
         if r.status_code != 200:
@@ -39,6 +47,21 @@ def crear_cliente(api_key=None):
     if not key:
         raise RuntimeError("Falta GROQ_API_KEY. Defínala en el archivo .env o en la barra lateral de la app.")
     return ClienteChat(key)
+
+
+def elegir_modelo(cliente):
+    """Usa MODELO_CHAT si está definido. Si no, el primer modelo preferido disponible para la clave."""
+    if MODELO:
+        return MODELO
+    try:
+        disponibles = cliente.modelos()
+    except Exception:
+        return PREFERIDOS[0]
+    for m in PREFERIDOS:
+        if m in disponibles:
+            return m
+    chat = [m for m in disponibles if not any(x in m for x in ("whisper", "tts", "orpheus", "guard"))]
+    return chat[0] if chat else PREFERIDOS[0]
 
 
 def ejecutar_herramienta(nombre, argumentos):
@@ -62,9 +85,14 @@ def responder(pregunta, cliente, historial=None, contexto=None):
     mensajes += list(historial or [])
     mensajes.append({"role": "user", "content": pregunta})
     traza = []
+    modelo = getattr(cliente, "modelo", None) or elegir_modelo(cliente)
+    try:
+        cliente.modelo = modelo
+    except AttributeError:
+        pass
     for paso in range(T_MAX):
         try:
-            msg = cliente.completar(model=MODELO, messages=mensajes, tools=ESQUEMAS,
+            msg = cliente.completar(model=modelo, messages=mensajes, tools=ESQUEMAS,
                                     tool_choice="auto", temperature=0.1, max_tokens=700)
         except Exception as e:
             return f"No se pudo contactar al modelo de lenguaje ({type(e).__name__}): {e}", traza

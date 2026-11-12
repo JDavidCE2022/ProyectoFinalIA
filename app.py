@@ -42,7 +42,7 @@ st.sidebar.divider()
 st.sidebar.subheader("Agente")
 clave = st.sidebar.text_input("GROQ_API_KEY", type="password", value="",
                               help="Opcional si ya está en el archivo .env. No se guarda.")
-st.sidebar.caption(f"Modelo de chat: {agente.MODELO}")
+st.sidebar.caption(f"Modelo de chat: {st.session_state.get('modelo_chat', agente.MODELO or 'se elige automáticamente')}")
 st.sidebar.caption("Datos: SIATA (PM2.5) y Open-Meteo (clima). Herramienta académica, no es pronóstico oficial.")
 
 nombre_est = estaciones.set_index("serial").loc[serial, "nombre"]
@@ -139,6 +139,9 @@ with tab_chat:
                 cliente = agente.crear_cliente(clave or None)
                 ctx = f"estación seleccionada {nombre_est} (serial {serial}), fecha seleccionada {fecha.date()}"
                 hist = [m for m in st.session_state.mensajes[:-1]][-6:]
+                if "modelo_chat" not in st.session_state:
+                    st.session_state.modelo_chat = agente.elegir_modelo(cliente)
+                cliente.modelo = st.session_state.modelo_chat
                 with st.spinner("Consultando herramientas..."):
                     resp, traza = agente.responder(pregunta, cliente, hist, ctx)
             except Exception as e:

@@ -32,6 +32,8 @@ CITA = re.compile(r"\[(\d{2}_[a-z0-9_]+#\d+|SIATA|Modelo del proyecto)[^\]]*\]",
 
 def main():
     cliente = agente.crear_cliente()
+    cliente.modelo = agente.elegir_modelo(cliente)
+    print("Modelo de chat:", cliente.modelo)
     filas = []
     for i, (q, esperada) in enumerate(PREGUNTAS, 1):
         t0 = time.time()
@@ -54,7 +56,7 @@ def main():
     df.to_csv("resultados/evaluacion_agente.csv", index=False)
     resumen = (f"Herramienta correcta: {df.herramienta_correcta.sum()}/{len(df)}  \n"
                f"Cita de fuente (o abstención en la pregunta fuera del corpus): {df.cito_fuente.sum()}/{len(df)}  \n"
-               f"Modelo: {agente.MODELO}")
+               f"Modelo: {cliente.modelo}")
     tabla = df.drop(columns=["respuesta"]).to_markdown(index=False)
     respuestas = "\n\n".join(f"**{r.n}. {r.pregunta}**\n\n{r.respuesta}" for r in df.itertuples())
     Path("resultados/evaluacion_agente.md").write_text(
