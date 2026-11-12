@@ -1,7 +1,7 @@
 """Agente con loop manual de tool calling sobre un endpoint compatible con OpenAI (Groq por defecto)."""
 import json
 import os
-from openai import OpenAI
+import requests
 from herramientas import HERRAMIENTAS, ESQUEMAS, FECHA_MAX
 
 T_MAX = 5
@@ -19,11 +19,26 @@ Reglas:
 6. Los datos disponibles van hasta {FECHA_MAX.date()}. Si el usuario dice hoy, usa esa fecha y acláralo."""
 
 
+class ClienteChat:
+    """Cliente mínimo para un endpoint /chat/completions compatible con OpenAI, usando solo requests."""
+
+    def __init__(self, api_key, base_url=BASE_URL, timeout=60):
+        self.url = base_url.rstrip("/") + "/chat/completions"
+        self.headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        self.timeout = timeout
+
+    def completar(self, **cuerpo):
+        r = requests.post(self.url, headers=self.headers, json=cuerpo, timeout=self.timeout)
+        if r.status_code != 200:
+            raise RuntimeError(f"HTTP {r.status_code}: {r.text[:300]}")
+        return r.json()["choices"][0]["message"]
+
+
 def crear_cliente(api_key=None):
-    key = api_key or os.getenv("GROQ_API_KEY")
+    key = (api_key or os.getenv("GROQ_API_KEY") or "").strip()
     if not key:
         raise RuntimeError("Falta GROQ_API_KEY. Defínala en el archivo .env o en la barra lateral de la app.")
-    return OpenAI(base_url=BASE_URL, api_key=key)
+    return ClienteChat(key)
 
 
 def ejecutar_herramienta(nombre, argumentos):
@@ -49,23 +64,24 @@ def responder(pregunta, cliente, historial=None, contexto=None):
     traza = []
     for paso in range(T_MAX):
         try:
-            r = cliente.chat.completions.create(model=MODELO, messages=mensajes, tools=ESQUEMAS,
-                                                tool_choice="auto", temperature=0.1, max_tokens=700)
+            msg = cliente.completar(model=MODELO, messages=mensajes, tools=ESQUEMAS,
+                                    tool_choice="auto", temperature=0.1, max_tokens=700)
         except Exception as e:
-            return f"No se pudo contactar al modelo de lenguaje: {e}", traza
-        msg = r.choices[0].message
-        if not msg.tool_calls:
-            return (msg.content or "").strip(), traza
-        mensajes.append({"role": "assistant", "content": msg.content or "",
-                         "tool_calls": [{"id": tc.id, "type": "function",
-                                         "function": {"name": tc.function.name, "arguments": tc.function.arguments}}
-                                        for tc in msg.tool_calls]})
-        for tc in msg.tool_calls:
-            obs = ejecutar_herramienta(tc.function.name, tc.function.arguments)
-            traza.append({"paso": paso + 1, "herramienta": tc.function.name, "argumentos": tc.function.arguments,
+            return f"No se pudo contactar al modelo de lenguaje ({type(e).__name__}): {e}", traza
+        llamadas = msg.get("tool_calls") or []
+        if not llamadas:
+            return (msg.get("content") or "").strip(), traza
+        mensajes.append({"role": "assistant", "content": msg.get("content") or "",
+                         "tool_calls": [{"id": tc["id"], "type": "function",
+                                         "function": {"name": tc["function"]["name"], "arguments": tc["function"]["arguments"]}}
+                                        for tc in llamadas]})
+        for tc in llamadas:
+            nombre, args = tc["function"]["name"], tc["function"]["arguments"]
+            obs = ejecutar_herramienta(nombre, args)
+            traza.append({"paso": paso + 1, "herramienta": nombre, "argumentos": args,
                           "error": obs.get("error") if isinstance(obs, dict) else None})
             # Los errores vuelven al modelo como observación para que pueda corregir
-            mensajes.append({"role": "tool", "tool_call_id": tc.id, "content": json.dumps(obs, ensure_ascii=False, default=str)[:6000]})
+            mensajes.append({"role": "tool", "tool_call_id": tc["id"], "content": json.dumps(obs, ensure_ascii=False, default=str)[:6000]})
     return "Se alcanzó el número máximo de pasos sin una respuesta final. Intente con una pregunta más concreta.", traza
 
 
