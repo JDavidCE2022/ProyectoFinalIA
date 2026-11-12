@@ -1,0 +1,6 @@
+,MAE,accuracy,f1_macro,recall_Dañina,precision_Dañina,recall_Buena
+Ridge + umbrales ajustados,3.4144,0.8042,0.6761,0.6923,0.4809,0.629
+Ridge con cortes ICA,3.4144,0.8323,0.646,0.522,0.6643,0.3291
+Naive Bayes,,0.8009,0.5499,0.2967,0.5625,0.2845
+Persistencia,3.6086,0.8178,0.6854,0.6044,0.6044,0.569
+Clase mayoritaria,,0.7859,0.2934,0.0,0.0,0.0
