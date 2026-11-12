@@ -1,6 +1,8 @@
 """Agente con loop manual de tool calling sobre un endpoint compatible con OpenAI (Groq por defecto)."""
 import json
 import os
+import re
+import time
 import requests
 from herramientas import HERRAMIENTAS, ESQUEMAS, FECHA_MAX
 
@@ -35,11 +37,17 @@ class ClienteChat:
         r.raise_for_status()
         return [m["id"] for m in r.json().get("data", [])]
 
-    def completar(self, **cuerpo):
-        r = requests.post(self.url, headers=self.headers, json=cuerpo, timeout=self.timeout)
-        if r.status_code != 200:
-            raise RuntimeError(f"HTTP {r.status_code}: {r.text[:300]}")
-        return r.json()["choices"][0]["message"]
+    def completar(self, reintentos=4, **cuerpo):
+        for intento in range(reintentos + 1):
+            r = requests.post(self.url, headers=self.headers, json=cuerpo, timeout=self.timeout)
+            if r.status_code == 429 and intento < reintentos:
+                # Límite de la capa gratuita: se espera lo que indica el servidor y se reintenta
+                m = re.search(r"try again in ([\d.]+)s", r.text)
+                time.sleep(min(float(m.group(1)) + 1 if m else 5 * (intento + 1), 30))
+                continue
+            if r.status_code != 200:
+                raise RuntimeError(f"HTTP {r.status_code}: {r.text[:300]}")
+            return r.json()["choices"][0]["message"]
 
 
 def crear_cliente(api_key=None):
@@ -98,7 +106,9 @@ def responder(pregunta, cliente, historial=None, contexto=None):
             return f"No se pudo contactar al modelo de lenguaje ({type(e).__name__}): {e}", traza
         llamadas = msg.get("tool_calls") or []
         if not llamadas:
-            return (msg.get("content") or "").strip(), traza
+            texto = (msg.get("content") or "").strip()
+            # Algunos modelos citan con corchetes 【 】; se normalizan a [ ]
+            return texto.replace("【", "[").replace("】", "]"), traza
         mensajes.append({"role": "assistant", "content": msg.get("content") or "",
                          "tool_calls": [{"id": tc["id"], "type": "function",
                                          "function": {"name": tc["function"]["name"], "arguments": tc["function"]["arguments"]}}

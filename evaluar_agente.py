@@ -27,7 +27,7 @@ PREGUNTAS = [
     ("¿Cuál es el costo del parqueadero del Metro de Medellín?", "ninguna"),
 ]
 
-CITA = re.compile(r"\[(\d{2}_[a-z0-9_]+#\d+|SIATA|Modelo del proyecto)[^\]]*\]", re.I)
+CITA = re.compile(r"[\[【](\d{2}_[a-z0-9_]+#\d+|SIATA|Modelo del proyecto)[^\]】]*[\]】]", re.I)
 
 
 def main():
@@ -39,7 +39,10 @@ def main():
         t0 = time.time()
         resp, traza = agente.responder(q, cliente)
         usadas = [t["herramienta"] for t in traza]
-        if esperada == "ninguna":
+        fallo = resp.startswith("No se pudo contactar") or resp.startswith("Se alcanzó el número máximo")
+        if fallo:
+            correcta, cito = False, False
+        elif esperada == "ninguna":
             correcta = "search_docs" in usadas or not usadas
             cito = "no" in resp.lower() and ("información" in resp.lower() or "tengo" in resp.lower())
         else:
@@ -50,7 +53,7 @@ def main():
                       "errores_herramienta": sum(1 for t in traza if t["error"]),
                       "segundos": round(time.time() - t0, 1), "respuesta": resp.replace("\n", " ")})
         print(f"{i:2d} {'OK ' if correcta else 'MAL'} cita={cito} {usadas}")
-        time.sleep(2)  # margen para el límite de solicitudes de la capa gratuita
+        time.sleep(10)  # margen para el límite de tokens por minuto de la capa gratuita
     df = pd.DataFrame(filas)
     Path("resultados").mkdir(exist_ok=True)
     df.to_csv("resultados/evaluacion_agente.csv", index=False)
