@@ -76,15 +76,7 @@ Como trabajo futuro se propone incorporar el pronóstico de Open-Meteo, más añ
 
 ## 7. Declaración de uso de IA generativa
 
-Se usó Claude (Anthropic) como asistente para:
-
-- localizar y descargar las fuentes de datos,
-- proponer la arquitectura,
-- escribir y depurar el código,
-- redactar los documentos del corpus a partir de las fuentes citadas,
-- redactar el README y este informe.
-
-El autor ejecutó la aplicación y la evaluación del agente en su equipo, verificó los resultados e identificó los errores que se corrigieron:
+Se usó Claude (Anthropic) como asistente de programación y redacción para: descargar las fuentes de datos, proponer la estructura del proyecto, escribir y depurar el código de `src/`, `app.py` y los scripts, redactar los documentos del corpus a partir de las fuentes citadas, y redactar el README y este informe. El autor eligió la idea del proyecto, ejecutó la aplicación y la evaluación del agente en su equipo, detectó los errores de ejecución que llevaron a las correcciones y revisó los resultados, y es responsable de las decisiones finales y de la verificación de que el código corre. Los errores detectados en la ejecución fueron:
 
 - incompatibilidad del SDK de `openai` en Anaconda, que se resolvió llamando a la API con `requests`,
 - modelo de Groq no disponible para la clave, que se resolvió con selección automática,
