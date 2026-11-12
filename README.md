@@ -36,7 +36,7 @@ La app abre en http://localhost:8501. El modelo entrenado y los datos procesados
 ```bash
 python src/datos.py        # construye data/processed/dataset_modelo.csv
 python src/modelo.py       # validación temporal, métricas y modelo final
-python evaluar_agente.py   # 13 preguntas de prueba al agente (requiere la clave)
+python evaluar_agente.py   # 13 preguntas de prueba al agente (requiere la clave, tarda unos 3 minutos)
 ```
 
 El notebook `notebooks/01_datos_y_modelo.ipynb` contiene el análisis exploratorio, la verificación de la implementación y la evaluación del modelo, ya ejecutados.
@@ -80,7 +80,7 @@ Validación temporal mes a mes de noviembre de 2023 a julio de 2024 (4198 predic
 | Persistencia (línea base) | 3.61 | 0.818 | 0.685 | 0.604 |
 | Clase mayoritaria (línea base) | | 0.786 | 0.293 | 0.000 |
 
-La evaluación del agente está en `resultados/evaluacion_agente.md`.
+Evaluación del agente con 13 preguntas fijas y el modelo `openai/gpt-oss-120b`: herramienta correcta en 13/13, cita de fuente o abstención en 13/13 y 0 errores de herramienta. Detalle y respuestas completas en `resultados/evaluacion_agente.md`. El informe completo está en `INFORME.pdf`.
 
 ## Limitaciones
 
